@@ -22,6 +22,16 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 4000;
 
+// 방의 게임 상태를 완전히 리셋하는 헬퍼 함수
+function resetRoom(room) {
+  room.status = 'playing';
+  room.board = createEmptyBoard();
+  room.currentTurn = 'black';
+  room.history = [];
+  room.undoCount = { black: 3, white: 3 };
+  room.pendingRequest = null;
+}
+
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
@@ -107,11 +117,7 @@ io.on('connection', (socket) => {
     const roomId = users[socket.id]?.currentRoom;
     const room = rooms[roomId];
     if (room && room.players.black === socket.id && room.status === 'full') {
-      room.status = 'playing';
-      room.board = createEmptyBoard();
-      room.currentTurn = 'black';
-      room.history = [];
-      room.undoCount = { black: 3, white: 3 };
+      resetRoom(room);
       
       io.to(roomId).emit('game_started', {
         board: room.board,
@@ -138,8 +144,8 @@ io.on('connection', (socket) => {
 
     const color = isBlack ? 1 : 2;
 
-    // 3-3 검사
-    if (room.rule33) {
+    // 3-3 검사 (흑돌에만 적용)
+    if (room.rule33 && color === 1) {
       if (check33(room.board, row, col, color)) {
         socket.emit('invalid_move', { message: '3-3 금수 자리입니다.' });
         return;
@@ -177,13 +183,14 @@ io.on('connection', (socket) => {
       const oppRole = role === 'black' ? 'white' : 'black';
       const oppSocket = room.players[oppRole];
 
-      if (actionType === 'resign') {
-          room.status = 'finished';
-          io.to(roomId).emit('game_over', { winner: oppRole });
-          return;
-      }
+      // 이미 대기 중인 요청이 있으면 무시
+      if (room.pendingRequest) return;
 
-      if (actionType === 'undo') {
+      if (actionType === 'resign') {
+          // 기권도 상대방 수락 절차를 거침
+          room.pendingRequest = `resign_${role}`;
+          io.to(oppSocket).emit('action_requested', { type: 'resign', requester: role });
+      } else if (actionType === 'undo') {
           if (room.undoCount[role] <= 0 || room.history.length === 0) return;
           room.pendingRequest = `undo_${role}`;
           io.to(oppSocket).emit('action_requested', { type: 'undo', requester: role });
@@ -202,6 +209,7 @@ io.on('connection', (socket) => {
       const role = room.players.black === socket.id ? 'black' : 'white';
       const [type, requester] = room.pendingRequest.split('_');
       
+      // 요청자 본인이 응답하는 것은 무시
       if (requester === role) return;
 
       if (accept) {
@@ -212,21 +220,25 @@ io.on('connection', (socket) => {
                   room.board[lastMove.row][lastMove.col] = 0;
                   room.currentTurn = lastMove.color === 1 ? 'black' : 'white';
               }
-              io.to(roomId).emit('action_accepted', { type: 'undo', board: room.board, currentTurn: room.currentTurn, undoCount: room.undoCount });
-          } else if (type === 'rematch') {
-              room.status = 'playing';
-              room.board = createEmptyBoard();
-              room.currentTurn = 'black';
-              room.history = [];
-              room.undoCount = { black: 3, white: 3 };
-              io.to(roomId).emit('game_started', {
+              io.to(roomId).emit('action_accepted', { 
+                  type: 'undo', 
+                  board: room.board, 
+                  currentTurn: room.currentTurn, 
+                  undoCount: room.undoCount 
+              });
+          } else if (type === 'resign' || type === 'rematch') {
+              // 기권 수락 또는 재시작 수락 → 보드 완전 리셋 후 새 게임 시작
+              resetRoom(room);
+              io.to(roomId).emit('game_restarted', {
                   board: room.board,
                   currentTurn: room.currentTurn,
-                  undoCount: room.undoCount
+                  undoCount: room.undoCount,
+                  reason: type // 'resign' 또는 'rematch'
               });
           }
       } else {
-           io.to(room.players[requester]).emit('action_rejected', { type });
+          // 거절
+          io.to(room.players[requester]).emit('action_rejected', { type });
       }
       room.pendingRequest = null;
   });

@@ -11,6 +11,8 @@ function App() {
   useEffect(() => {
     if (!socket) return;
 
+    // 최초 게임 시작 시에만 lobby → game 전환
+    // (게임 중 재시작은 Game.jsx의 game_restarted 핸들러에서 처리)
     socket.on('game_started', (data) => {
       setRoomData(prev => ({ ...prev, ...data }));
       setGameState('game');

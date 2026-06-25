@@ -1,39 +1,63 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { Home, Undo2, Flag } from 'lucide-react';
 import clsx from 'clsx';
 
+const EMPTY_BOARD = Array(15).fill(null).map(() => Array(15).fill(0));
+
 const Game = ({ roomData, setGameState, setRoomData }) => {
   const socket = useSocket();
-  const [board, setBoard] = useState(roomData.board || Array(15).fill(Array(15).fill(0)));
+  const [board, setBoard] = useState(roomData.board || EMPTY_BOARD);
   const [currentTurn, setCurrentTurn] = useState(roomData.currentTurn || 'black');
   const [undoCount, setUndoCount] = useState(roomData.undoCount || { black: 3, white: 3 });
   const [modal, setModal] = useState(null); 
+  const [gameStatus, setGameStatus] = useState('playing'); // 'playing', 'finished'
 
   const myRole = roomData.myRole || 'black'; 
   const isMyTurn = currentTurn === myRole;
 
+  // 보드를 완전 리셋하는 함수
+  const resetGameState = useCallback((data) => {
+    const newBoard = data.board || Array(15).fill(null).map(() => Array(15).fill(0));
+    setBoard(newBoard);
+    setCurrentTurn(data.currentTurn || 'black');
+    setUndoCount(data.undoCount || { black: 3, white: 3 });
+    setModal(null);
+    setGameStatus('playing');
+  }, []);
+
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('board_update', (data) => {
+    const handleBoardUpdate = (data) => {
       setBoard(data.board);
       setCurrentTurn(data.currentTurn);
-    });
+    };
 
-    socket.on('game_started', (data) => {
-      setBoard(data.board);
-      setCurrentTurn(data.currentTurn);
-      setUndoCount(data.undoCount);
-      setModal(null);
-    });
+    const handleGameStarted = (data) => {
+      // 최초 게임 시작 (App.jsx에서 game 화면으로 전환 후 호출될 수 있음)
+      resetGameState(data);
+    };
 
-    socket.on('invalid_move', (data) => {
+    const handleGameRestarted = (data) => {
+      // 기권 수락 또는 재시작 수락 → 보드 완전 리셋
+      const reasonMsg = data.reason === 'resign' ? '기권이 수락되었습니다.' : '재도전이 수락되었습니다.';
+      resetGameState(data);
+      // 잠시 후 알림 (state 업데이트 후)
+      setTimeout(() => {
+        alert(`${reasonMsg} 새 게임을 시작합니다!`);
+      }, 100);
+    };
+
+    const handleInvalidMove = (data) => {
       alert(data.message);
-    });
+    };
 
-    socket.on('game_over', (data) => {
-      setBoard(data.board || board);
+    const handleGameOver = (data) => {
+      if (data.board) {
+        setBoard(data.board);
+      }
+      setGameStatus('finished');
       const isWinner = data.winner === myRole;
       setModal({
         type: 'game_over',
@@ -46,21 +70,19 @@ const Game = ({ roomData, setGameState, setRoomData }) => {
             title: '재도전 요청 완료',
             message: '상대방의 응답을 기다리는 중입니다...',
             onCancel: () => {
-              socket.emit('request_action', 'resign');
               setGameState('lobby');
               setRoomData(null);
             }
           });
         },
         onCancel: () => {
-          socket.emit('request_action', 'resign');
           setGameState('lobby');
           setRoomData(null);
         }
       });
-    });
+    };
 
-    socket.on('action_requested', (data) => {
+    const handleActionRequested = (data) => {
       let title = '';
       let message = '';
       if (data.type === 'undo') {
@@ -69,6 +91,9 @@ const Game = ({ roomData, setGameState, setRoomData }) => {
       } else if (data.type === 'rematch') {
         title = '재도전 요청';
         message = '상대방이 재도전을 요청했습니다. 수락하시겠습니까?';
+      } else if (data.type === 'resign') {
+        title = '기권 요청';
+        message = '상대방이 기권을 요청했습니다. 수락하시겠습니까?';
       }
 
       setModal({
@@ -84,58 +109,100 @@ const Game = ({ roomData, setGameState, setRoomData }) => {
           setModal(null);
         }
       });
-    });
+    };
 
-    socket.on('action_accepted', (data) => {
+    const handleActionAccepted = (data) => {
       if (data.type === 'undo') {
         setBoard(data.board);
         setCurrentTurn(data.currentTurn);
         setUndoCount(data.undoCount);
+        setModal(null);
         alert('무르기가 수락되었습니다.');
       }
-    });
+    };
 
-    socket.on('action_rejected', (data) => {
-      alert('상대방이 요청을 거절했습니다.');
+    const handleActionRejected = (data) => {
       if (data.type === 'rematch') {
-          setGameState('lobby');
-          setRoomData(null);
+        alert('상대방이 재도전을 거절했습니다.');
+        setGameState('lobby');
+        setRoomData(null);
+      } else if (data.type === 'resign') {
+        alert('상대방이 기권 요청을 거절했습니다. 게임을 계속합니다.');
+        setModal(null);
       } else {
-          setModal(null);
+        alert('상대방이 요청을 거절했습니다.');
+        setModal(null);
       }
-    });
+    };
+
+    socket.on('board_update', handleBoardUpdate);
+    socket.on('game_started', handleGameStarted);
+    socket.on('game_restarted', handleGameRestarted);
+    socket.on('invalid_move', handleInvalidMove);
+    socket.on('game_over', handleGameOver);
+    socket.on('action_requested', handleActionRequested);
+    socket.on('action_accepted', handleActionAccepted);
+    socket.on('action_rejected', handleActionRejected);
 
     return () => {
-      socket.off('board_update');
-      socket.off('invalid_move');
-      socket.off('game_over');
-      socket.off('action_requested');
-      socket.off('action_accepted');
-      socket.off('action_rejected');
+      socket.off('board_update', handleBoardUpdate);
+      socket.off('game_started', handleGameStarted);
+      socket.off('game_restarted', handleGameRestarted);
+      socket.off('invalid_move', handleInvalidMove);
+      socket.off('game_over', handleGameOver);
+      socket.off('action_requested', handleActionRequested);
+      socket.off('action_accepted', handleActionAccepted);
+      socket.off('action_rejected', handleActionRejected);
     };
-  }, [socket, board, myRole, setGameState, setRoomData]);
+    // 의존성에서 board를 제거하여 클로저 문제 방지
+    // myRole은 roomData에서 한 번만 설정되므로 안전
+  }, [socket, myRole, setGameState, setRoomData, resetGameState]);
 
   const handleCellClick = (r, c) => {
-    if (!isMyTurn || board[r][c] !== 0) return;
+    if (!isMyTurn || board[r][c] !== 0 || gameStatus !== 'playing') return;
     socket.emit('place_stone', { row: r, col: c });
   };
 
   const handleHomeClick = () => {
-    if (confirm('정말 홈으로 돌아가시겠습니까? 진행 중인 게임은 기권 처리됩니다.')) {
+    if (confirm('정말 홈으로 돌아가시겠습니까? 진행 중인 게임은 포기됩니다.')) {
       setGameState('lobby');
       setRoomData(null);
-      socket.emit('request_action', 'resign');
     }
   };
 
   const handleUndo = () => {
     if (undoCount[myRole] > 0) {
       socket.emit('request_action', 'undo');
+      setModal({
+        type: 'waiting',
+        title: '무르기 요청 중',
+        message: '상대방의 응답을 기다리는 중입니다...'
+      });
     }
   };
 
   const handleResign = () => {
-    socket.emit('request_action', 'resign');
+    if (gameStatus !== 'playing') return;
+    
+    setModal({
+      type: 'confirm_resign',
+      title: '기권 확인',
+      message: '정말 기권하시겠습니까? 상대방이 수락하면 새 게임이 시작됩니다.',
+      onConfirm: () => {
+        socket.emit('request_action', 'resign');
+        setModal({
+          type: 'waiting',
+          title: '기권 요청 중',
+          message: '상대방의 응답을 기다리는 중입니다...',
+          onCancel: () => {
+            setModal(null);
+          }
+        });
+      },
+      onCancel: () => {
+        setModal(null);
+      }
+    });
   };
 
   const renderBoard = () => {
@@ -193,7 +260,8 @@ const Game = ({ roomData, setGameState, setRoomData }) => {
             <div className="w-4 h-4 rounded-full bg-white border border-gray-400 mr-2 shadow-sm"></div>
         )}
         <span className={clsx("font-bold", isMyTurn ? "text-yellow-400" : "text-gray-300")}>
-          {isMyTurn ? "내 턴입니다! 돌을 놓으세요." : "상대방의 턴입니다. 기다려주세요."}
+          {gameStatus === 'finished' ? "게임이 종료되었습니다." :
+           isMyTurn ? "내 턴입니다! 돌을 놓으세요." : "상대방의 턴입니다. 기다려주세요."}
         </span>
       </div>
 
@@ -210,7 +278,7 @@ const Game = ({ roomData, setGameState, setRoomData }) => {
       <div className="bg-bottomBar p-4 flex justify-center space-x-4">
         <button 
           onClick={handleUndo}
-          disabled={undoCount[myRole] === 0 || !isMyTurn}
+          disabled={undoCount[myRole] === 0 || !isMyTurn || gameStatus !== 'playing'}
           className="flex items-center bg-blueBtn text-white px-6 py-3 rounded-full font-bold shadow-md hover:bg-blue-600 disabled:bg-blue-300 transition"
         >
           <Undo2 className="w-5 h-5 mr-2" />
@@ -218,7 +286,8 @@ const Game = ({ roomData, setGameState, setRoomData }) => {
         </button>
         <button 
           onClick={handleResign}
-          className="flex items-center bg-redBtn text-white px-6 py-3 rounded-full font-bold shadow-md hover:bg-red-600 transition"
+          disabled={gameStatus !== 'playing'}
+          className="flex items-center bg-redBtn text-white px-6 py-3 rounded-full font-bold shadow-md hover:bg-red-600 disabled:bg-red-300 transition"
         >
           <Flag className="w-5 h-5 mr-2" />
           기권/재시작
@@ -237,7 +306,9 @@ const Game = ({ roomData, setGameState, setRoomData }) => {
                   onClick={modal.onCancel}
                   className="px-4 py-2 bg-gray-300 text-gray-800 rounded font-bold hover:bg-gray-400 transition"
                 >
-                  {modal.type === 'waiting' ? '나가기' : '거절/나가기'}
+                  {modal.type === 'waiting' ? '나가기' : 
+                   modal.type === 'confirm_resign' ? '취소' :
+                   modal.type === 'game_over' ? '나가기' : '거절'}
                 </button>
               )}
               {modal.onConfirm && (
@@ -245,7 +316,9 @@ const Game = ({ roomData, setGameState, setRoomData }) => {
                   onClick={modal.onConfirm}
                   className="px-4 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 transition"
                 >
-                  수락/재도전
+                  {modal.type === 'confirm_resign' ? '기권하기' :
+                   modal.type === 'game_over' ? '재도전' :
+                   modal.type === 'request' ? '수락' : '확인'}
                 </button>
               )}
             </div>
