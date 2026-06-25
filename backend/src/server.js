@@ -139,7 +139,7 @@ io.on('connection', (socket) => {
     const color = isBlack ? 1 : 2;
 
     // 3-3 검사
-    if (room.rule33 && isBlack) {
+    if (room.rule33) {
       if (check33(room.board, row, col, color)) {
         socket.emit('invalid_move', { message: '3-3 금수 자리입니다.' });
         return;
@@ -177,13 +177,16 @@ io.on('connection', (socket) => {
       const oppRole = role === 'black' ? 'white' : 'black';
       const oppSocket = room.players[oppRole];
 
+      if (actionType === 'resign') {
+          room.status = 'finished';
+          io.to(roomId).emit('game_over', { winner: oppRole });
+          return;
+      }
+
       if (actionType === 'undo') {
           if (room.undoCount[role] <= 0 || room.history.length === 0) return;
           room.pendingRequest = `undo_${role}`;
           io.to(oppSocket).emit('action_requested', { type: 'undo', requester: role });
-      } else if (actionType === 'resign') {
-           room.pendingRequest = `resign_${role}`;
-           io.to(oppSocket).emit('action_requested', { type: 'resign', requester: role });
       } else if (actionType === 'rematch') {
           room.pendingRequest = `rematch_${role}`;
           io.to(oppSocket).emit('action_requested', { type: 'rematch', requester: role });
@@ -210,9 +213,6 @@ io.on('connection', (socket) => {
                   room.currentTurn = lastMove.color === 1 ? 'black' : 'white';
               }
               io.to(roomId).emit('action_accepted', { type: 'undo', board: room.board, currentTurn: room.currentTurn, undoCount: room.undoCount });
-          } else if (type === 'resign') {
-              room.status = 'finished';
-              io.to(roomId).emit('game_over', { winner: role });
           } else if (type === 'rematch') {
               room.status = 'playing';
               room.board = createEmptyBoard();

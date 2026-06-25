@@ -21,6 +21,13 @@ const Game = ({ roomData, setGameState, setRoomData }) => {
       setCurrentTurn(data.currentTurn);
     });
 
+    socket.on('game_started', (data) => {
+      setBoard(data.board);
+      setCurrentTurn(data.currentTurn);
+      setUndoCount(data.undoCount);
+      setModal(null);
+    });
+
     socket.on('invalid_move', (data) => {
       alert(data.message);
     });
@@ -34,9 +41,19 @@ const Game = ({ roomData, setGameState, setRoomData }) => {
         message: '게임을 다시 시작하시겠습니까?',
         onConfirm: () => {
           socket.emit('request_action', 'rematch');
-          setModal(null);
+          setModal({
+            type: 'waiting',
+            title: '재도전 요청 완료',
+            message: '상대방의 응답을 기다리는 중입니다...',
+            onCancel: () => {
+              socket.emit('request_action', 'resign');
+              setGameState('lobby');
+              setRoomData(null);
+            }
+          });
         },
         onCancel: () => {
+          socket.emit('request_action', 'resign');
           setGameState('lobby');
           setRoomData(null);
         }
@@ -49,9 +66,6 @@ const Game = ({ roomData, setGameState, setRoomData }) => {
       if (data.type === 'undo') {
         title = '무르기 요청';
         message = '상대방이 무르기를 요청했습니다. 수락하시겠습니까?';
-      } else if (data.type === 'resign') {
-        title = '기권';
-        message = '상대방이 기권했습니다.'; 
       } else if (data.type === 'rematch') {
         title = '재도전 요청';
         message = '상대방이 재도전을 요청했습니다. 수락하시겠습니까?';
@@ -83,6 +97,12 @@ const Game = ({ roomData, setGameState, setRoomData }) => {
 
     socket.on('action_rejected', (data) => {
       alert('상대방이 요청을 거절했습니다.');
+      if (data.type === 'rematch') {
+          setGameState('lobby');
+          setRoomData(null);
+      } else {
+          setModal(null);
+      }
     });
 
     return () => {
@@ -212,18 +232,22 @@ const Game = ({ roomData, setGameState, setRoomData }) => {
             <h2 className="text-2xl font-bold mb-4">{modal.title}</h2>
             <p className="text-gray-600 mb-8">{modal.message}</p>
             <div className="flex justify-center space-x-4">
-              <button 
-                onClick={modal.onCancel}
-                className="px-4 py-2 bg-gray-300 text-gray-800 rounded font-bold hover:bg-gray-400 transition"
-              >
-                거절/나가기
-              </button>
-              <button 
-                onClick={modal.onConfirm}
-                className="px-4 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 transition"
-              >
-                수락/재도전
-              </button>
+              {modal.onCancel && (
+                <button 
+                  onClick={modal.onCancel}
+                  className="px-4 py-2 bg-gray-300 text-gray-800 rounded font-bold hover:bg-gray-400 transition"
+                >
+                  {modal.type === 'waiting' ? '나가기' : '거절/나가기'}
+                </button>
+              )}
+              {modal.onConfirm && (
+                <button 
+                  onClick={modal.onConfirm}
+                  className="px-4 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 transition"
+                >
+                  수락/재도전
+                </button>
+              )}
             </div>
           </div>
         </div>

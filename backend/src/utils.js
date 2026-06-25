@@ -32,8 +32,6 @@ export const checkWin = (board, row, col, color) => {
 
 // 기본 3-3 검사 로직
 export const check33 = (board, row, col, color) => {
-  if (color !== 1) return false; // 흑돌만 3-3 적용
-
   const directions = [
     [1, 0], [0, 1], [1, 1], [1, -1]
   ];
@@ -58,7 +56,7 @@ const isOpen3 = (board, r, c, dr, dc, color) => {
         const nr = r + dr * i;
         const nc = c + dc * i;
         if (nr < 0 || nr >= 15 || nc < 0 || nc >= 15) {
-            line += "W"; 
+            line += "2"; 
         } else if (board[nr][nc] === 0) {
             line += "0"; 
         } else if (board[nr][nc] === color) {
@@ -68,23 +66,19 @@ const isOpen3 = (board, r, c, dr, dc, color) => {
         }
     }
 
-    const patterns = [
-        "01110",
-        "010110",
-        "011010"
-    ];
-
-    for (let pattern of patterns) {
-        let idx = line.indexOf(pattern);
-        while (idx !== -1) {
-            // 이번에 착수한 돌(index 4)이 해당 패턴에 포함되어 있는지 확인
-            if (4 >= idx && 4 < idx + pattern.length) {
-                // 패턴 자체에 포함되어 있고, 그 돌이 1인 경우
-                if (line[4] === "1") {
+    for (let emptyIdx = 0; emptyIdx < line.length; emptyIdx++) {
+        if (line[emptyIdx] === "0") {
+            const testLine = line.substring(0, emptyIdx) + "1" + line.substring(emptyIdx + 1);
+            let matchIdx = testLine.indexOf("011110");
+            while (matchIdx !== -1) {
+                const emptyIsPart = emptyIdx >= matchIdx + 1 && emptyIdx <= matchIdx + 4;
+                const placedIsPart = 4 >= matchIdx + 1 && 4 <= matchIdx + 4;
+                
+                if (emptyIsPart && placedIsPart) {
                     return true;
                 }
+                matchIdx = testLine.indexOf("011110", matchIdx + 1);
             }
-            idx = line.indexOf(pattern, idx + 1);
         }
     }
     return false;
