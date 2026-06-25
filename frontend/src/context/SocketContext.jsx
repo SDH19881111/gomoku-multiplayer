@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 const SocketContext = createContext();
 
 // 배포 시 환경 변수로 URL 설정 가능
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://gomoku-multiplayer-sin.onrender.com';
 
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);

@@ -8,6 +8,10 @@ import { generateRoomCode, createEmptyBoard, checkWin, check33 } from './utils.j
 const app = express();
 app.use(cors());
 
+app.get('/', (req, res) => {
+  res.send('오목 백엔드 서버가 정상적으로 실행 중입니다!');
+});
+
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
