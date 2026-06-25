@@ -2,10 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { User, PlusCircle, LogIn, CheckSquare, Square } from 'lucide-react';
 
-const Lobby = ({ roomData, setRoomData }) => {
+const Lobby = ({ roomData, setRoomData, nickname, setNickname, isNicknameSet, setIsNicknameSet }) => {
   const socket = useSocket();
-  const [nickname, setNickname] = useState('');
-  const [isNicknameSet, setIsNicknameSet] = useState(false);
   const [rooms, setRooms] = useState([]);
   const [rule33, setRule33] = useState(true);
   const [joinCode, setJoinCode] = useState('');

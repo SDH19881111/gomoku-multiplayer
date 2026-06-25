@@ -7,6 +7,8 @@ function App() {
   const socket = useSocket();
   const [gameState, setGameState] = useState('lobby'); // 'lobby', 'game'
   const [roomData, setRoomData] = useState(null);
+  const [nickname, setNickname] = useState('');
+  const [isNicknameSet, setIsNicknameSet] = useState(false);
 
   useEffect(() => {
     if (!socket) return;
@@ -34,7 +36,16 @@ function App() {
 
   return (
     <div className="w-full h-screen bg-slate-100 flex items-center justify-center overflow-hidden font-sans">
-      {gameState === 'lobby' && <Lobby roomData={roomData} setRoomData={setRoomData} />}
+      {gameState === 'lobby' && (
+        <Lobby 
+          roomData={roomData} 
+          setRoomData={setRoomData} 
+          nickname={nickname}
+          setNickname={setNickname}
+          isNicknameSet={isNicknameSet}
+          setIsNicknameSet={setIsNicknameSet}
+        />
+      )}
       {gameState === 'game' && <Game roomData={roomData} setGameState={setGameState} setRoomData={setRoomData} />}
     </div>
   );
