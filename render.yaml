@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: gomoku-backend
+    name: gomoku-multiplayer-sin
     env: node
     plan: free
     rootDir: backend
