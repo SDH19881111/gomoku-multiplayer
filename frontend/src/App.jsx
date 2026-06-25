@@ -32,7 +32,7 @@ function App() {
 
   return (
     <div className="w-full h-screen bg-slate-100 flex items-center justify-center overflow-hidden font-sans">
-      {gameState === 'lobby' && <Lobby setRoomData={setRoomData} />}
+      {gameState === 'lobby' && <Lobby roomData={roomData} setRoomData={setRoomData} />}
       {gameState === 'game' && <Game roomData={roomData} setGameState={setGameState} setRoomData={setRoomData} />}
     </div>
   );

@@ -59,6 +59,8 @@ const Lobby = ({ roomData, setRoomData }) => {
     if (!roomId.trim()) return;
     socket.emit('join_room', roomId, (res) => {
       if (res.success) {
+        setMyRoomCode(roomId);
+        setInRoom(true);
         setRoomData({ roomId, status: 'full', myRole: 'white' }); 
       } else {
         alert(res.message);
@@ -104,22 +106,36 @@ const Lobby = ({ roomData, setRoomData }) => {
 
   if (inRoom) {
       const isFull = roomData?.status === 'full';
+      const isHost = roomData?.myRole === 'black';
+
       return (
           <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-center">
-              <h2 className="text-2xl font-bold mb-4">방 대기중...</h2>
+              <h2 className="text-2xl font-bold mb-4">{isHost ? "방 대기중..." : "방 입장 완료!"}</h2>
               <div className="text-6xl font-mono tracking-wider font-bold text-blue-600 mb-6">{myRoomCode}</div>
-              <p className="text-gray-500 mb-8">친구에게 위 방 코드를 알려주세요!</p>
               
-              {isFull && <p className="text-green-600 font-bold mb-4">참가자({roomData?.white})가 입장했습니다!</p>}
-
-              <button
-                  onClick={handleStartGame}
-                  disabled={!isFull}
-                  className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
-              >
-                  게임 시작
-              </button>
-              {!isFull && <p className="text-xs text-gray-400 mt-2">상대방이 접속하면 버튼이 활성화됩니다.</p>}
+              {isHost ? (
+                  <>
+                      <p className="text-gray-500 mb-8">친구에게 위 방 코드를 알려주세요!</p>
+                      {isFull && <p className="text-green-600 font-bold mb-4">참가자({roomData?.white})가 입장했습니다!</p>}
+                      <button
+                          onClick={handleStartGame}
+                          disabled={!isFull}
+                          className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                      >
+                          게임 시작
+                      </button>
+                      {!isFull && <p className="text-xs text-gray-400 mt-2">상대방이 접속하면 버튼이 활성화됩니다.</p>}
+                  </>
+              ) : (
+                  <>
+                      <p className="text-green-600 font-bold mb-8">방장이 게임을 시작하기를 기다리고 있습니다...</p>
+                      <div className="flex justify-center items-center space-x-2 text-gray-500">
+                          <div className="w-4 h-4 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                          <div className="w-4 h-4 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                          <div className="w-4 h-4 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                      </div>
+                  </>
+              )}
           </div>
       )
   }
