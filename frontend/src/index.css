@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f8fafc;
+}
+
+.board-grid {
+  display: grid;
+  grid-template-columns: repeat(15, 1fr);
+  grid-template-rows: repeat(15, 1fr);
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.cell {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+}
+
+/* 선 그리기 */
+.cell::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-color: #4a3b22;
+  z-index: 1;
+}
+
+.cell::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background-color: #4a3b22;
+  z-index: 1;
+}
+
+/* 가장자리 선 정리 */
+.cell.top-edge::after { top: 50%; }
+.cell.bottom-edge::after { bottom: 50%; }
+.cell.left-edge::before { left: 50%; }
+.cell.right-edge::before { right: 50%; }
+
+.stone {
+  width: 80%;
+  height: 80%;
+  border-radius: 50%;
+  z-index: 10;
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+}
+
+.stone.black {
+  background: radial-gradient(circle at 30% 30%, #444, #000);
+}
+
+.stone.white {
+  background: radial-gradient(circle at 30% 30%, #fff, #ccc);
+}
+
+/* 천원(별) 표시 */
+.star-point {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background-color: #4a3b22;
+  border-radius: 50%;
+  z-index: 5;
+}
